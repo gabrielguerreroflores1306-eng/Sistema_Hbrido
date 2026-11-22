@@ -3,290 +3,403 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>VLA Smart Home</title>
 <style>
-:root{color-scheme:dark;--bg:#0b1120;--card:#162238;--line:#29364d;--muted:#94a3b8;--blue:#699bff}
+:root{
+  --bg:#0b1220;--card:#17243a;--line:#293a53;
+  --text:#f8fafc;--muted:#94a3b8;--blue:#548dff;
+}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:#f8fafc;font-family:Arial,sans-serif}
-header{padding:22px 6%;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
-.logo{font-size:22px;font-weight:800}.muted{color:var(--muted);font-size:13px}
-main{max-width:1100px;margin:25px auto;padding:0 18px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:17px;padding:22px;margin-bottom:18px}
-.hero{display:flex;justify-content:space-between;align-items:center;background:linear-gradient(120deg,#193756,#172338)}
-h2{font-size:18px;margin:0 0 18px}
-h3{font-size:15px;margin:0 0 9px}
-.big{font-size:32px;font-weight:800;margin:13px 0 4px}
+body{margin:0;background:var(--bg);color:var(--text);
+font-family:Arial,Helvetica,sans-serif}
+header{padding:22px 5%;border-bottom:1px solid var(--line);
+display:flex;justify-content:space-between;align-items:center;gap:12px}
+.logo{font-size:22px;font-weight:800}
+small,.muted{color:var(--muted)}
+main{max-width:1100px;margin:25px auto;padding:0 15px}
+.card{background:var(--card);border:1px solid var(--line);
+border-radius:17px;padding:22px;margin-bottom:17px}
+.hero{background:linear-gradient(110deg,#1a3655,#17243a)}
+.row{display:flex;justify-content:space-between;
+align-items:center;gap:14px}
 .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:15px}
-.small{font-size:12px;color:var(--muted)}
-.status{display:inline-block;padding:8px 12px;border-radius:20px;background:#374151;color:#ddd;font-size:12px}
+h2{font-size:19px;margin:8px 0 17px}
+h3{margin:8px 0;font-size:16px}
+.big{font-size:30px;font-weight:800;margin:18px 0 8px}
+.badge{border-radius:20px;padding:9px 12px;
+background:#334155;font-size:12px}
 .ok{color:#86efac}.danger{color:#f87171}
+button{border:0;border-radius:10px;padding:12px 17px;
+background:var(--blue);color:white;font-weight:bold;cursor:pointer}
+button:disabled{opacity:.4;cursor:not-allowed}
+.secondary{background:#334155}
 .controls{display:grid;grid-template-columns:1fr 1fr;gap:15px}
-.device{display:flex;align-items:center;justify-content:space-between}
-.switch{position:relative;width:56px;height:31px}
+.device{display:flex;justify-content:space-between;align-items:center}
+.switch{position:relative;width:58px;height:32px}
 .switch input{opacity:0}
-.slider{position:absolute;inset:0;border-radius:30px;background:#475569;cursor:pointer;transition:.2s}
-.slider:before{content:"";position:absolute;width:23px;height:23px;left:4px;top:4px;border-radius:50%;background:white;transition:.2s}
+.slider{position:absolute;inset:0;background:#475569;
+border-radius:20px;cursor:pointer;transition:.2s}
+.slider:before{content:"";position:absolute;left:4px;top:4px;
+width:24px;height:24px;border-radius:50%;
+background:white;transition:.2s}
 input:checked+.slider{background:#2563eb}
-input:checked+.slider:before{transform:translateX(25px)}
-button{background:#2563eb;color:white;border:0;padding:12px 17px;border-radius:9px;cursor:pointer;font-weight:bold}
-button:disabled{opacity:.5}
-input[type=email],input[type=password]{background:#0b1120;color:white;padding:13px;border:1px solid #334155;border-radius:9px;width:100%;margin:7px 0}
-#login{max-width:420px;margin:70px auto}
-.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.hidden{display:none!important}
-#message{color:#93c5fd;font-size:13px}
+input:checked+.slider:before{transform:translateX(26px)}
+.switch input:disabled+.slider{opacity:.45;cursor:not-allowed}
+.actions{display:flex;gap:10px;flex-wrap:wrap}
+#events{color:#cbd5e1;font-size:13px;line-height:1.9;max-height:190px;overflow:auto}
 footer{text-align:center;color:#64748b;padding:25px}
-@media(max-width:750px){.grid{grid-template-columns:repeat(2,1fr)}.controls{grid-template-columns:1fr}.big{font-size:26px}header{padding:18px}}
+@media(max-width:750px){
+.grid{grid-template-columns:repeat(2,1fr)}
+.controls{grid-template-columns:1fr}
+header{padding:17px}
+.logo{font-size:18px}
+.big{font-size:25px}
+}
 </style>
 </head>
 <body>
 
 <header>
-  <div>
-    <div class="logo">⌂ VLA Smart Home</div>
-    <div class="muted">Control residencial ESP32-S3</div>
-  </div>
-  <span class="status" id="connection">Desconectado</span>
+<div>
+  <div class="logo">⌂ VLA Smart Home</div>
+  <small>Automatización residencial ESP32-S3</small>
+</div>
+<span id="connection" class="badge">Desconectado</span>
 </header>
 
 <main>
-<section class="card" id="login">
-  <h2>Acceder al sistema</h2>
-  <p class="muted">Ingresa con tu usuario autorizado de Firebase.</p>
-  <input id="email" type="email" placeholder="Correo electrónico">
-  <input id="password" type="password" placeholder="Contraseña">
-  <button id="enter">Ingresar</button>
-  <p id="loginError" class="danger"></p>
+
+<section class="card">
+<div class="row">
+  <div>
+    <h2>Conexión Bluetooth</h2>
+    <p class="muted">Conecta directamente con tu ESP32-S3.</p>
+  </div>
+  <span style="font-size:34px">📶</span>
+</div>
+<div class="actions">
+<button id="connect">Conectar ESP32-S3</button>
+<button id="disconnect" class="secondary" disabled>Desconectar</button>
+</div>
+<p id="message" class="muted">Esperando conexión...</p>
 </section>
 
-<div id="dashboard" class="hidden">
-
-  <section class="card hero">
-    <div>
-      <div class="small">ESTADO DE SEGURIDAD</div>
-      <h2 id="security" style="margin:10px 0;color:#86efac">Esperando datos...</h2>
-      <div class="muted" id="lastUpdate">Sin información reciente</div>
-    </div>
-    <div style="font-size:48px" id="securityIcon">🛡️</div>
-  </section>
-
-  <h2>Monitoreo ambiental</h2>
-  <section class="grid">
-    <div class="card">
-      <div class="muted">🌡️ Temperatura</div>
-      <div class="big" id="temp">--</div>
-      <div class="small">Grados Celsius</div>
-    </div>
-    <div class="card">
-      <div class="muted">💧 Humedad</div>
-      <div class="big" id="hum">--</div>
-      <div class="small">Porcentaje</div>
-    </div>
-    <div class="card">
-      <div class="muted">🌫️ MQ-2</div>
-      <div class="big" id="gas">--</div>
-      <div class="small">Lectura ADC (0–4095)</div>
-    </div>
-    <div class="card">
-      <div class="muted">📈 Pico sísmico</div>
-      <div class="big" id="peak">--</div>
-      <div class="small">Aceleración diferencial (G)</div>
-    </div>
-  </section>
-
-  <h2>Alertas del sistema</h2>
-  <section class="grid">
-    <div class="card"><h3>🔥 Flama</h3><strong id="flame">--</strong></div>
-    <div class="card"><h3>🌫️ Gas / humo</h3><strong id="gasAlert">--</strong></div>
-    <div class="card"><h3>📳 Sismo</h3><strong id="quake">--</strong></div>
-    <div class="card"><h3>🚨 Sirena</h3><strong id="siren">--</strong></div>
-  </section>
-
-  <h2>Control de iluminación</h2>
-  <section class="controls">
-    <div class="card device">
-      <div>
-        <h3>💡 Primer piso</h3>
-        <div class="muted" id="label1">Esperando...</div>
-      </div>
-      <label class="switch">
-        <input type="checkbox" id="light1" disabled>
-        <span class="slider"></span>
-      </label>
-    </div>
-
-    <div class="card device">
-      <div>
-        <h3>💡 Segundo piso</h3>
-        <div class="muted" id="label2">Esperando...</div>
-      </div>
-      <label class="switch">
-        <input type="checkbox" id="light2" disabled>
-        <span class="slider"></span>
-      </label>
-    </div>
-  </section>
-
-  <section class="card">
-    <div class="row">
-      <button id="allOn">Encender ambos pisos</button>
-      <button id="allOff">Apagar ambos pisos</button>
-      <button id="logout" style="background:#475569">Salir</button>
-    </div>
-    <p id="message"></p>
-  </section>
+<section class="card hero">
+<div class="row">
+<div>
+  <small>ESTADO GENERAL</small>
+  <h2 id="security" style="color:#fbbf24">Sin conexión</h2>
+  <small id="updated">Sin datos del dispositivo</small>
 </div>
+<div id="shield" style="font-size:48px">🛡️</div>
+</div>
+</section>
+
+<h2>Monitoreo ambiental</h2>
+
+<section class="grid">
+<div class="card">
+<small>🌡️ Temperatura</small>
+<div class="big" id="temp">--</div>
+<small>Grados Celsius</small>
+</div>
+
+<div class="card">
+<small>💧 Humedad</small>
+<div class="big" id="hum">--</div>
+<small>Porcentaje</small>
+</div>
+
+<div class="card">
+<small>🌫️ Gas / humo MQ-2</small>
+<div class="big" id="mq2">--</div>
+<small>Lectura ADC</small>
+</div>
+
+<div class="card">
+<small>📈 Vibración</small>
+<div class="big" id="peak">--</div>
+<small>Pico diferencial en G</small>
+</div>
+</section>
+
+<h2>Estado de seguridad</h2>
+<section class="grid">
+<div class="card"><h3>🔥 Flama</h3><strong id="flame">--</strong></div>
+<div class="card"><h3>🌫️ Gas / humo</h3><strong id="gas">--</strong></div>
+<div class="card"><h3>📳 Sismo</h3><strong id="quake">--</strong></div>
+<div class="card"><h3>🚨 Sirena</h3><strong id="siren">--</strong></div>
+</section>
+
+<h2>Control de iluminación</h2>
+<section class="controls">
+
+<div class="card device">
+<div>
+<h3>💡 Primer piso</h3>
+<small id="label1">Desconectado</small>
+</div>
+<label class="switch">
+<input type="checkbox" id="light1" disabled>
+<span class="slider"></span>
+</label>
+</div>
+
+<div class="card device">
+<div>
+<h3>💡 Segundo piso</h3>
+<small id="label2">Desconectado</small>
+</div>
+<label class="switch">
+<input type="checkbox" id="light2" disabled>
+<span class="slider"></span>
+</label>
+</div>
+
+</section>
+
+<section class="card">
+<h2>Controles generales</h2>
+<div class="actions">
+<button id="allOn" disabled>Encender ambos pisos</button>
+<button id="allOff" class="secondary" disabled>Apagar ambos pisos</button>
+</div>
+<p class="muted">Durante una alerta sísmica, el parpadeo de emergencia tiene prioridad.</p>
+</section>
+
+<section class="card">
+<h2>Registro de eventos</h2>
+<div id="events">Esperando conexión Bluetooth...</div>
+</section>
+
 </main>
 
-<footer>VLA Smart Home · ESP32-S3 · Proyecto de automatización residencial</footer>
+<footer>VLA Smart Home · ESP32-S3 · BLE + ESP-NOW</footer>
 
-<script type="module">
-import {initializeApp} from
-"https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-import {getAuth,signInWithEmailAndPassword,onAuthStateChanged,signOut} from
-"https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import {getDatabase,ref,onValue,update} from
-"https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
+<script>
+// ===== UUID COMPARTIDOS CON ARDUINO =====
+const SERVICE_UUID =
+"73a10000-90ab-4d37-bb9e-75b4a20f0001";
 
-// COMPLETAR CON LOS DATOS DE TU PROYECTO FIREBASE
-const firebaseConfig = {
-  apiKey: "TU_FIREBASE_API_KEY",
-  authDomain: "TU_PROYECTO.firebaseapp.com",
-  databaseURL: "https://TU_PROYECTO-default-rtdb.firebaseio.com",
-  projectId: "TU_PROYECTO",
-  appId: "TU_APP_ID"
-};
+const ENV_UUID =
+"73a10001-90ab-4d37-bb9e-75b4a20f0001";
 
-const app=initializeApp(firebaseConfig);
-const auth=getAuth(app);
-const db=getDatabase(app);
+const STATUS_UUID =
+"73a10002-90ab-4d37-bb9e-75b4a20f0001";
+
+const QUAKE_UUID =
+"73a10003-90ab-4d37-bb9e-75b4a20f0001";
+
+const CONTROL_UUID =
+"73a10004-90ab-4d37-bb9e-75b4a20f0001";
+
 const $=id=>document.getElementById(id);
-let lastSeen=0,received=false;
-let cancelListeners=[];
-let controlsReady=false;
-let online=false;
 
-function status(label,active=false){
-  $("connection").textContent=label;
-  $("connection").style.background=active?"#14532d":"#374151";
+let device=null;
+let server=null;
+let control=null;
+let connected=false;
+let earthquake=false;
+let flame=false;
+let gas=false;
+let siren=false;
+let commandQueue=Promise.resolve();
+
+function log(text){
+const time=new Date().toLocaleTimeString();
+const line=document.createElement("div");
+line.textContent="["+time+"] "+text;
+$("events").prepend(line);
+while($("events").children.length>50)
+  $("events").lastChild.remove();
 }
 
-function state(id,value){
-  $(id).textContent=value?"ALERTA":"NORMAL";
-  $(id).className=value?"danger":"ok";
+function setConnection(value){
+connected=value;
+$("connection").textContent=value?"● BLE conectado":"○ Desconectado";
+$("connection").style.background=value?"#14532d":"#334155";
+$("connect").disabled=value;
+$("disconnect").disabled=!value;
+$("allOn").disabled=!value;
+$("allOff").disabled=!value;
+$("light1").disabled=!value;
+$("light2").disabled=!value;
+
+if(!value){
+  $("security").textContent="Sin conexión";
+  $("security").style.color="#fbbf24";
+  $("updated").textContent="Sin datos recientes";
+  $("temp").textContent="--";
+  $("hum").textContent="--";
+  $("mq2").textContent="--";
+  $("peak").textContent="--";
+  for(const id of ["flame","gas","quake","siren"])
+    $(id).textContent="--";
+  $("label1").textContent="Desconectado";
+  $("label2").textContent="Desconectado";
+  $("shield").textContent="📡";
+}
 }
 
-function render(d){
-  if(!d)return;
-  received=true;
-  lastSeen=Number(d.lastUpdate)||0;
-
-  $("temp").textContent=typeof d.temperature==="number"?d.temperature.toFixed(1)+" °C":"--";
-  $("hum").textContent=typeof d.humidity==="number"?d.humidity.toFixed(1)+" %":"--";
-  $("gas").textContent=d.mq2??"--";
-  $("peak").textContent=typeof d.peakG==="number"?d.peakG.toFixed(3)+" G":"--";
-
-  state("flame",!!d.flameAlert);
-  state("gasAlert",!!d.gasAlert);
-  state("quake",!!d.earthquake);
-
-  $("siren").textContent=d.siren?"ACTIVA":"APAGADA";
-  $("siren").className=d.siren?"danger":"ok";
-
-  const alert=!!(d.flameAlert||d.gasAlert||d.earthquake);
-  $("security").textContent=alert?"ALERTA DETECTADA":"Vivienda en estado normal";
-  $("security").style.color=alert?"#f87171":"#86efac";
-  $("securityIcon").textContent=alert?"⚠️":"🛡️";
-  $("lastUpdate").textContent=lastSeen?
-    "Última lectura: "+new Date(lastSeen).toLocaleString("es-PE"):
-    "Esperando fecha del dispositivo";
+function showFlag(id,value){
+$(id).textContent=value?"ALERTA":"NORMAL";
+$(id).className=value?"danger":"ok";
 }
 
-$("enter").onclick=async()=>{
-  $("loginError").textContent="";
-  try{
-    await signInWithEmailAndPassword(
-      auth,$("email").value.trim(),$("password").value
-    );
-  }catch(e){
-    $("loginError").textContent="No se pudo ingresar. Verifica usuario y contraseña.";
-  }
+function refreshSecurity(){
+const alert=earthquake||flame||gas;
+$("security").textContent=alert?
+  "¡ALERTA DETECTADA!":"Vivienda en estado normal";
+$("security").style.color=alert?"#f87171":"#86efac";
+$("shield").textContent=alert?"⚠️":"🛡️";
+}
+
+function decode(event){
+return new TextDecoder().decode(event.target.value).trim();
+}
+
+function handleEnvironment(str){
+const p=str.split(",");
+if(p.length<3)return;
+
+$("temp").textContent=p[0]==="nan"?"--":p[0]+" °C";
+$("hum").textContent=p[1]==="nan"?"--":p[1]+" %";
+$("mq2").textContent=p[2];
+$("updated").textContent=
+"Última lectura: "+new Date().toLocaleTimeString();
+}
+
+function handleStatus(str){
+const p=str.split(",");
+if(p.length<6)return;
+
+const prevAlert=earthquake||flame||gas;
+flame=p[0]==="1";
+gas=p[1]==="1";
+earthquake=p[2]==="1";
+siren=p[3]==="1";
+
+const l1=p[4]==="1";
+const l2=p[5]==="1";
+
+$("light1").checked=l1;
+$("light2").checked=l2;
+$("label1").textContent=l1?"Encendido":"Apagado";
+$("label2").textContent=l2?"Encendido":"Apagado";
+
+showFlag("flame",flame);
+showFlag("gas",gas);
+showFlag("quake",earthquake);
+
+$("siren").textContent=siren?"ACTIVA":"APAGADA";
+$("siren").className=siren?"danger":"ok";
+
+refreshSecurity();
+
+const nowAlert=earthquake||flame||gas;
+if(nowAlert&&!prevAlert)log("Alerta detectada por sensores");
+if(!nowAlert&&prevAlert)log("Condiciones normalizadas");
+}
+
+function handleQuake(str){
+$("peak").textContent=str+" G";
+}
+
+async function subscribe(uuid,handler){
+const ch=await server.getPrimaryService(SERVICE_UUID)
+  .then(s=>s.getCharacteristic(uuid));
+
+const process=e=>handler(decode(e));
+
+const initial=await ch.readValue();
+handler(new TextDecoder().decode(initial));
+
+await ch.startNotifications();
+ch.addEventListener(
+  "characteristicvaluechanged",process
+);
+return ch;
+}
+
+async function connectBLE(){
+if(!navigator.bluetooth){
+  $("message").textContent=
+  "Este navegador no admite Web Bluetooth. Usa Chrome o Edge compatible.";
+  return;
+}
+
+try{
+  $("message").textContent="Buscando ESP32-S3...";
+  device=await navigator.bluetooth.requestDevice({
+    filters:[{name:"VLA-Smart-Home"}],
+    optionalServices:[SERVICE_UUID]
+  });
+
+  device.addEventListener(
+    "gattserverdisconnected",()=>{
+      control=null;
+      server=null;
+      setConnection(false);
+      log("Bluetooth desconectado");
+    }
+  );
+
+  server=await device.gatt.connect();
+  const service=await server.getPrimaryService(SERVICE_UUID);
+
+  control=await service.getCharacteristic(CONTROL_UUID);
+
+  await subscribe(ENV_UUID,handleEnvironment);
+  await subscribe(STATUS_UUID,handleStatus);
+  await subscribe(QUAKE_UUID,handleQuake);
+
+  setConnection(true);
+  $("message").textContent="Conectado directamente al ESP32-S3";
+  log("Conexión Bluetooth establecida");
+
+}catch(e){
+  $("message").textContent="No se pudo conectar: "+e.message;
+  setConnection(false);
+}
+}
+
+function send(command){
+commandQueue=commandQueue.catch(()=>{}).then(async()=>{
+  if(!connected||!control)throw Error("Sin conexión BLE");
+
+  const bytes=new TextEncoder().encode(command);
+  await control.writeValueWithResponse(bytes);
+  log("Comando enviado: "+command);
+}).catch(e=>{
+  $("message").textContent="Error de control: "+e.message;
+});
+return commandQueue;
+}
+
+$("connect").onclick=connectBLE;
+
+$("disconnect").onclick=()=>{
+if(device?.gatt?.connected)device.gatt.disconnect();
+setConnection(false);
 };
 
-$("logout").onclick=()=>signOut(auth);
+$("light1").onchange=e=>{
+const value=e.target.checked;
+e.target.checked=!value;
+send("L1="+(value?1:0));
+};
 
-onAuthStateChanged(auth,user=>{
-  cancelListeners.forEach(fn=>fn());
-  cancelListeners=[];
-  controlsReady=false;
-  received=false;lastSeen=0;
-  $("login").classList.toggle("hidden",!!user);
-  $("dashboard").classList.toggle("hidden",!user);
-  if(!user){status("Sin sesión");return}
+$("light2").onchange=e=>{
+const value=e.target.checked;
+e.target.checked=!value;
+send("L2="+(value?1:0));
+};
 
-  status("Esperando ESP32");
+$("allOn").onclick=()=>send("ALL=1");
+$("allOff").onclick=()=>send("ALL=0");
 
-  cancelListeners.push(onValue(
-    ref(db,"devices/home/telemetry"),
-    s=>render(s.val()),
-    ()=>status("Error de lectura")
-  ));
-
-  cancelListeners.push(onValue(
-    ref(db,"devices/home/commands"),
-    s=>{
-      const c=s.val()||{};
-      controlsReady=true;
-      for(let i=1;i<=2;i++){
-        $("light"+i).disabled=false;
-        $("light"+i).checked=c["light"+i]===true;
-        $("label"+i).textContent=
-          c["light"+i]===true?"Encendido solicitado":"Apagado solicitado";
-      }
-    },
-    ()=>{$("message").textContent="Sin permisos de control";}
-  ));
-});
-
-async function sendCommand(changes){
-  if(!controlsReady||!online){
-    $("message").textContent="ESP32 sin conexión o controles no disponibles.";
-    return;
-  }
-  $("message").textContent="Enviando comando...";
-  try{
-    await update(ref(db,"devices/home/commands"),changes);
-    $("message").textContent="Comando registrado. Esperando al ESP32.";
-  }catch(e){
-    $("message").textContent="Error al enviar el comando.";
-  }
-}
-
-for(let i=1;i<=2;i++){
-  $("light"+i).onchange=e=>{
-    const v=e.target.checked;
-    e.target.checked=!v;
-    sendCommand({["light"+i]:v});
-  };
-}
-$("allOn").onclick=()=>sendCommand({light1:true,light2:true});
-$("allOff").onclick=()=>sendCommand({light1:false,light2:false});
-
-setInterval(()=>{
-  if($("dashboard").classList.contains("hidden"))return;
-  online=received&&lastSeen>0&&
-    Math.abs(Date.now()-lastSeen)<20000;
-  status(online?"ESP32 conectado":"ESP32 sin conexión",online);
-  for(let i=1;i<=2;i++)$("light"+i).disabled=!online||!controlsReady;
-  $("allOn").disabled=!online||!controlsReady;
-  $("allOff").disabled=!online||!controlsReady;
-  if(!online){
-    $("security").textContent="Sin datos recientes";
-    $("security").style.color="#fbbf24";
-    $("securityIcon").textContent="📡";
-  }
-},2000);
+setConnection(false);
 </script>
 </body>
 </html>
