@@ -66,6 +66,7 @@ main {
   border-radius: 16px;
   padding: 21px;
   margin-bottom: 15px;
+  min-width: 0;
 }
 
 h2 {
@@ -79,7 +80,7 @@ h3 {
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
 }
 
@@ -124,6 +125,10 @@ button.secondary {
 
 button.danger {
   background: #a83e49;
+}
+
+button.warning {
+  background: #a16207;
 }
 
 button:disabled {
@@ -237,6 +242,27 @@ input:disabled + .slider {
   line-height: 1.5;
 }
 
+/* ======================================
+   ALARMA AMBIENTAL
+====================================== */
+
+.alarm-panel {
+  border-left: 4px solid #5289f7;
+}
+
+.alarm-panel.active {
+  border-left-color: #ef4444;
+}
+
+.alarm-panel.silenced {
+  border-left-color: #eab308;
+}
+
+#alarmMessage {
+  margin-top: 14px;
+  line-height: 1.6;
+}
+
 .pulse {
   animation: pulse 1.5s infinite;
 }
@@ -245,6 +271,7 @@ input:disabled + .slider {
   0%, 100% {
     opacity: 1;
   }
+
   50% {
     opacity: .55;
   }
@@ -267,7 +294,8 @@ footer {
 @media(max-width:760px) {
 
   .grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
   }
 
   .controls {
@@ -296,6 +324,7 @@ footer {
 <header>
 
   <div>
+
     <div class="logo">
       ⌂ VLA Smart Home
     </div>
@@ -303,6 +332,7 @@ footer {
     <small>
       Monitoreo y control residencial · ESP32-S3
     </small>
+
   </div>
 
   <span id="connection" class="badge">
@@ -314,7 +344,7 @@ footer {
 <main>
 
 <!-- =====================================
-     BLUETOOTH
+     CONEXION BLUETOOTH
 ===================================== -->
 
 <section class="card">
@@ -524,6 +554,71 @@ footer {
 </section>
 
 <!-- =====================================
+     CONTROL DE ALARMA AMBIENTAL
+===================================== -->
+
+<section class="card alarm-panel"
+         id="alarmPanel">
+
+  <div class="row">
+
+    <div>
+
+      <h2>Control de alarma ambiental</h2>
+
+      <small>
+        Recuperación automática y silenciamiento manual.
+      </small>
+
+    </div>
+
+    <div id="alarmIcon"
+         style="font-size:32px">
+
+      🔊
+
+    </div>
+
+  </div>
+
+  <div class="actions"
+       style="margin-top:15px">
+
+    <button id="muteGas"
+            class="warning"
+            disabled>
+
+      🔇 Silenciar alarma ambiental
+
+    </button>
+
+    <button id="unmuteGas"
+            class="secondary"
+            disabled>
+
+      🔊 Reactivar alarma ambiental
+
+    </button>
+
+  </div>
+
+  <p id="alarmMessage"
+     class="muted">
+
+    Esperando conexión Bluetooth.
+
+  </p>
+
+  <small>
+
+    El silenciamiento no desactiva el MQ-2
+    ni la alarma de flama.
+
+  </small>
+
+</section>
+
+<!-- =====================================
      CONTROL DE ILUMINACION
 ===================================== -->
 
@@ -586,7 +681,9 @@ footer {
   <div class="actions">
 
     <button id="allOn" disabled>
+
       Encender ambos pisos
+
     </button>
 
     <button id="allOff"
@@ -602,7 +699,7 @@ footer {
 </section>
 
 <!-- =====================================
-     BOMBA DE AGUA
+     CONTROL DE BOMBA
 ===================================== -->
 
 <h2>Suministro de agua</h2>
@@ -672,7 +769,9 @@ footer {
   <h2>Registro de eventos</h2>
 
   <div id="events">
+
     Esperando conexión Bluetooth.
+
   </div>
 
 </section>
@@ -722,16 +821,26 @@ let control = null;
 
 let connected = false;
 let blocked = false;
+
 let sismo = false;
 let flama = false;
 let gas = false;
 
+let sirenaActiva = false;
+let gasSilenciado = false;
+
 let statusReceived = false;
+let muteSupported = false;
 
 let mqPhase = -1;
 let mqRejected = 0;
 
 let sendQueue = Promise.resolve();
+
+let lastStatusAt = 0;
+let lastMQAt = 0;
+
+let telemetryFresh = false;
 
 // =======================================
 // REGISTRO DE EVENTOS
@@ -752,7 +861,6 @@ function log(msg) {
   while ($("events").children.length > 40) {
 
     $("events").lastChild.remove();
-
   }
 }
 
@@ -763,18 +871,21 @@ function log(msg) {
 function enableControls() {
 
   const available =
-    connected && statusReceived;
+    connected &&
+    statusReceived &&
+    telemetryFresh;
 
   for (const id of [
+
     "light1",
     "light2",
     "allOn",
     "allOff",
     "stopWater"
+
   ]) {
 
     $(id).disabled = !available;
-
   }
 
   $("water").disabled =
@@ -782,10 +893,24 @@ function enableControls() {
 
   $("resetWater").disabled =
     !available || !blocked || sismo;
+
+  // SILENCIAR SOLO DURANTE ALERTA
+  $("muteGas").disabled =
+    !available ||
+    !muteSupported ||
+    !gas ||
+    gasSilenciado ||
+    mqPhase !== 4;
+
+  // REACTIVAR SI ESTABA SILENCIADA
+  $("unmuteGas").disabled =
+    !available ||
+    !muteSupported ||
+    !gasSilenciado;
 }
 
 // =======================================
-// MOSTRAR ESTADOS
+// MOSTRAR ESTADOS BOOLEANOS
 // =======================================
 
 function show(id, value) {
@@ -814,7 +939,6 @@ function security() {
     $("security").className = "alert";
 
     $("shield").textContent = "⚠️";
-
   }
 
   else if (!statusReceived) {
@@ -825,7 +949,6 @@ function security() {
     $("security").className = "warn";
 
     $("shield").textContent = "📡";
-
   }
 
   else if (mqPhase === 0) {
@@ -836,7 +959,6 @@ function security() {
     $("security").className = "warn";
 
     $("shield").textContent = "⏳";
-
   }
 
   else if (mqPhase === 1) {
@@ -847,7 +969,6 @@ function security() {
     $("security").className = "warn";
 
     $("shield").textContent = "⏳";
-
   }
 
   else if (mqPhase === 3) {
@@ -858,7 +979,6 @@ function security() {
     $("security").className = "warn";
 
     $("shield").textContent = "⚠️";
-
   }
 
   else if (mqPhase === 2) {
@@ -869,7 +989,6 @@ function security() {
     $("security").className = "ok";
 
     $("shield").textContent = "🛡️";
-
   }
 
   else {
@@ -880,12 +999,21 @@ function security() {
     $("security").className = "warn";
 
     $("shield").textContent = "⏳";
+  }
 
+  if (connected && !telemetryFresh) {
+
+    $("security").textContent =
+      "Telemetría sin actualizar";
+
+    $("security").className = "warn";
+
+    $("shield").textContent = "📡";
   }
 }
 
 // =======================================
-// ESTADO DE GAS
+// MOSTRAR ESTADO DE GAS
 // =======================================
 
 function renderGas() {
@@ -895,7 +1023,6 @@ function renderGas() {
     $("gas").textContent = "ALERTA";
 
     $("gas").className = "alert";
-
   }
 
   else if (mqPhase === 0) {
@@ -903,7 +1030,6 @@ function renderGas() {
     $("gas").textContent = "CALENTANDO";
 
     $("gas").className = "warn";
-
   }
 
   else if (mqPhase === 1) {
@@ -911,7 +1037,6 @@ function renderGas() {
     $("gas").textContent = "CALIBRANDO";
 
     $("gas").className = "warn";
-
   }
 
   else if (mqPhase === 3) {
@@ -919,13 +1044,11 @@ function renderGas() {
     $("gas").textContent = "ADVERTENCIA";
 
     $("gas").className = "warn";
-
   }
 
   else if (mqPhase === 2 && statusReceived) {
 
     show("gas", false);
-
   }
 
   else {
@@ -933,8 +1056,194 @@ function renderGas() {
     $("gas").textContent = "NO DISPONIBLE";
 
     $("gas").className = "warn";
-
   }
+}
+
+// =======================================
+// MOSTRAR ESTADO REAL DE LA SIRENA
+// =======================================
+
+function renderSirena() {
+
+  if (!statusReceived) {
+
+    $("siren").textContent = "--";
+
+    $("siren").className = "warn";
+
+    return;
+  }
+
+  if (sirenaActiva) {
+
+    $("siren").textContent = "ACTIVA";
+
+    $("siren").className = "alert";
+  }
+
+  else if (gasSilenciado && gas) {
+
+    $("siren").textContent = "SILENCIADA";
+
+    $("siren").className = "warn";
+  }
+
+  else {
+
+    $("siren").textContent = "APAGADA";
+
+    $("siren").className = "ok";
+  }
+}
+
+// =======================================
+// CONTROL VISUAL DE ALARMA AMBIENTAL
+// =======================================
+
+function renderAlarmControl() {
+
+  const panel = $("alarmPanel");
+
+  panel.classList.remove(
+    "active",
+    "silenced"
+  );
+
+  if (!connected) {
+
+    $("alarmMessage").textContent =
+      "Esperando conexión Bluetooth.";
+
+    $("alarmMessage").className = "muted";
+
+    $("alarmIcon").textContent = "🔊";
+  }
+
+  else if (!telemetryFresh) {
+
+    $("alarmMessage").textContent =
+      "Sin telemetría reciente. " +
+      "Estado de alarma no confirmado.";
+
+    $("alarmMessage").className = "warn";
+
+    $("alarmIcon").textContent = "📡";
+  }
+
+  else if (!muteSupported) {
+
+    $("alarmMessage").textContent =
+      "Silenciamiento no disponible. " +
+      "Verifica la versión del ESP32.";
+
+    $("alarmMessage").className = "warn";
+
+    $("alarmIcon").textContent = "🔊";
+  }
+
+  else if (flama) {
+
+    panel.classList.add("active");
+
+    $("alarmMessage").textContent =
+      "Flama detectada. La sirena de incendio " +
+      "permanece activa independientemente " +
+      "del silenciamiento ambiental.";
+
+    $("alarmMessage").className = "alert";
+
+    $("alarmIcon").textContent = "🔥";
+  }
+
+  else if (gas && gasSilenciado) {
+
+    panel.classList.add("silenced");
+
+    $("alarmMessage").textContent =
+      "Alarma ambiental silenciada manualmente. " +
+      "El MQ-2 continúa monitoreando. " +
+      "La alerta permanece visible. " +
+      "Silenciamiento máximo: 5 minutos.";
+
+    $("alarmMessage").className = "warn";
+
+    $("alarmIcon").textContent = "🔇";
+  }
+
+  else if (gas) {
+
+    panel.classList.add("active");
+
+    $("alarmMessage").textContent =
+      "Anomalía ambiental detectada. " +
+      "Puedes silenciar temporalmente la sirena " +
+      "o esperar la recuperación automática.";
+
+    $("alarmMessage").className = "alert";
+
+    $("alarmIcon").textContent = "🚨";
+  }
+
+  else if (mqPhase === 0 || mqPhase === 1) {
+
+    $("alarmMessage").textContent =
+      "Sensor en calentamiento o calibración. " +
+      "La detección ambiental todavía " +
+      "no está disponible.";
+
+    $("alarmMessage").className = "warn";
+
+    $("alarmIcon").textContent = "⏳";
+  }
+
+  else if (mqPhase === 3) {
+
+    $("alarmMessage").textContent =
+      "Advertencia ambiental. El sistema " +
+      "continúa evaluando las lecturas.";
+
+    $("alarmMessage").className = "warn";
+
+    $("alarmIcon").textContent = "⚠️";
+  }
+
+  else if (mqPhase === 2) {
+
+    $("alarmMessage").textContent =
+      "Monitoreo activo. Sin alerta ambiental. " +
+      "La alarma se encuentra rearmada.";
+
+    $("alarmMessage").className = "ok";
+
+    $("alarmIcon").textContent = "🛡️";
+  }
+
+  else {
+
+    $("alarmMessage").textContent =
+      "Estado del MQ-2 no disponible.";
+
+    $("alarmMessage").className = "warn";
+  }
+
+  enableControls();
+}
+
+// =======================================
+// CONTROL DE TELEMETRIA
+// =======================================
+
+function updateFreshness() {
+
+  telemetryFresh =
+    statusReceived &&
+    Date.now() - lastStatusAt < 5000 &&
+    (
+      mqPhase === -1 ||
+      Date.now() - lastMQAt < 5000
+    );
+
+  enableControls();
 }
 
 // =======================================
@@ -944,7 +1253,10 @@ function renderGas() {
 function disconnectUI() {
 
   connected = false;
+
   statusReceived = false;
+  muteSupported = false;
+  telemetryFresh = false;
 
   control = null;
   server = null;
@@ -954,8 +1266,14 @@ function disconnectUI() {
   flama = false;
   gas = false;
 
+  sirenaActiva = false;
+  gasSilenciado = false;
+
   mqPhase = -1;
   mqRejected = 0;
+
+  lastStatusAt = 0;
+  lastMQAt = 0;
 
   $("connection").textContent =
     "Desconectado";
@@ -980,6 +1298,7 @@ function disconnectUI() {
   $("shield").textContent = "📡";
 
   for (const id of [
+
     "temp",
     "hum",
     "mq2",
@@ -988,14 +1307,16 @@ function disconnectUI() {
     "gas",
     "quake",
     "siren"
+
   ]) {
 
     $(id).textContent = "--";
 
     $(id).classList.remove(
-      "ok", "warn", "alert"
+      "ok",
+      "warn",
+      "alert"
     );
-
   }
 
   $("mqState").textContent =
@@ -1022,6 +1343,8 @@ function disconnectUI() {
 
   $("waterSafety").textContent =
     "Sin estado confirmado del ESP32-S3";
+
+  renderAlarmControl();
 }
 
 // =======================================
@@ -1052,7 +1375,7 @@ function environment(value) {
 }
 
 // =======================================
-// CALIBRACION MQ-2
+// ESTADO Y CALIBRACION MQ-2
 // =======================================
 
 function mqStatus(value) {
@@ -1063,16 +1386,21 @@ function mqStatus(value) {
 
   const phase = Number(p[0]);
 
-  if (!Number.isInteger(phase) ||
-      phase < 0 || phase > 4) {
+  if (
+    !Number.isInteger(phase) ||
+    phase < 0 ||
+    phase > 4
+  ) {
 
     return;
-
   }
 
   const progress = Math.max(
     0,
-    Math.min(100, Number(p[1]) || 0)
+    Math.min(
+      100,
+      Number(p[1]) || 0
+    )
   );
 
   const rejected = Math.max(
@@ -1084,8 +1412,23 @@ function mqStatus(value) {
 
   const oldRejected = mqRejected;
 
+  const oldSilenced = gasSilenciado;
+
+  const wasMuteSupported = muteSupported;
+
   mqPhase = phase;
   mqRejected = rejected;
+
+  muteSupported =
+    p.length >= 4 &&
+    (p[3] === "0" || p[3] === "1");
+
+  gasSilenciado =
+    muteSupported && p[3] === "1";
+
+  lastMQAt = Date.now();
+
+  updateFreshness();
 
   const calibrating =
     phase === 0 || phase === 1;
@@ -1096,7 +1439,9 @@ function mqStatus(value) {
   $("mqProgress").style.width =
     progress + "%";
 
+  // =====================================
   // CALENTAMIENTO
+  // =====================================
 
   if (phase === 0) {
 
@@ -1110,10 +1455,11 @@ function mqStatus(value) {
     $("mqDetail").textContent =
       "Estabilización inicial. " +
       "Detección de gas no disponible.";
-
   }
 
+  // =====================================
   // CALIBRACION
+  // =====================================
 
   else if (phase === 1) {
 
@@ -1129,10 +1475,11 @@ function mqStatus(value) {
       "Ventanas rechazadas: " +
       rejected +
       ". El progreso puede reiniciarse.";
-
   }
 
+  // =====================================
   // MONITOREO NORMAL
+  // =====================================
 
   else if (phase === 2) {
 
@@ -1145,10 +1492,11 @@ function mqStatus(value) {
     $("mqDetail").textContent =
       "Calibración completada. " +
       "Detección adaptativa habilitada.";
-
   }
 
+  // =====================================
   // ADVERTENCIA
+  // =====================================
 
   else if (phase === 3) {
 
@@ -1161,10 +1509,11 @@ function mqStatus(value) {
     $("mqDetail").textContent =
       "Incremento ambiental anormal. " +
       "Adaptación estadística suspendida.";
-
   }
 
+  // =====================================
   // ALERTA
+  // =====================================
 
   else if (phase === 4) {
 
@@ -1174,13 +1523,25 @@ function mqStatus(value) {
     $("mqState").className =
       "mq-state alert pulse";
 
-    $("mqDetail").textContent =
-      "Anomalía detectada. " +
-      "Alarma activada.";
+    if (gasSilenciado) {
 
+      $("mqDetail").textContent =
+        "Anomalía persistente. " +
+        "Sirena ambiental silenciada. " +
+        "Monitoreo activo.";
+    }
+
+    else {
+
+      $("mqDetail").textContent =
+        "Anomalía detectada. " +
+        "Alarma ambiental activa.";
+    }
   }
 
-  // REGISTRO DE CAMBIOS
+  // =====================================
+  // REGISTRAR CAMBIOS DE ESTADO
+  // =====================================
 
   if (oldPhase !== phase) {
 
@@ -1195,16 +1556,26 @@ function mqStatus(value) {
       "MQ-2: advertencia ambiental",
 
       "MQ-2: ALERTA DE GAS / HUMO"
-
     ];
 
     log(messages[phase]);
 
-    if (phase === 2 &&
-        (oldPhase === 0 || oldPhase === 1)) {
+    if (
+      phase === 2 &&
+      (oldPhase === 0 || oldPhase === 1)
+    ) {
 
       log("MQ-2: calibración completada");
+    }
 
+    if (
+      phase === 2 &&
+      (oldPhase === 3 || oldPhase === 4)
+    ) {
+
+      log(
+        "MQ-2: recuperación ambiental confirmada"
+      );
     }
   }
 
@@ -1215,11 +1586,48 @@ function mqStatus(value) {
       "Esperando estabilidad. Total: " +
       rejected
     );
+  }
 
+  // =====================================
+  // REGISTRAR SILENCIAMIENTO
+  // =====================================
+
+  if (gasSilenciado && !oldSilenced) {
+
+    log(
+      "Alarma ambiental silenciada"
+    );
+  }
+
+  if (
+    wasMuteSupported &&
+    muteSupported &&
+    !gasSilenciado &&
+    oldSilenced
+  ) {
+
+    if (phase === 2) {
+
+      log(
+        "Rearme automático de alarma ambiental"
+      );
+    }
+
+    else {
+
+      log(
+        "Silenciamiento ambiental finalizado"
+      );
+    }
   }
 
   renderGas();
+
+  renderSirena();
+
   security();
+
+  renderAlarmControl();
 }
 
 // =======================================
@@ -1233,10 +1641,14 @@ function status(value) {
   if (p.length < 8) return;
 
   if (!p.slice(0, 8).every(
+
     v => v === "0" || v === "1"
+
   )) return;
 
   statusReceived = true;
+
+  lastStatusAt = Date.now();
 
   const oldBlock = blocked;
   const oldSismo = sismo;
@@ -1244,8 +1656,12 @@ function status(value) {
   const oldGas = gas;
 
   flama = p[0] === "1";
+
   gas = p[1] === "1";
+
   sismo = p[2] === "1";
+
+  sirenaActiva = p[3] === "1";
 
   blocked = p[7] === "1";
 
@@ -1271,9 +1687,13 @@ function status(value) {
 
   $("waterLabel").textContent =
     blocked
+
       ? "BLOQUEADA POR SISMO"
+
       : pump
+
         ? "Bomba encendida"
+
         : "Bomba apagada";
 
   $("waterSafety").textContent =
@@ -1288,60 +1708,56 @@ function status(value) {
 
         : "Control manual disponible (prototipo).";
 
-  show("flame", flama);
+  updateFreshness();
 
-  renderGas();
+  show("flame", flama);
 
   show("quake", sismo);
 
-  $("siren").textContent =
-    p[3] === "1"
-      ? "ACTIVA"
-      : "APAGADA";
+  renderGas();
 
-  $("siren").className =
-    p[3] === "1"
-      ? "alert"
-      : "ok";
+  renderSirena();
 
   security();
 
-  enableControls();
+  renderAlarmControl();
 
   if (blocked && !oldBlock) {
 
     log("CORTE DE AGUA: bomba bloqueada");
-
   }
 
   if (sismo && !oldSismo) {
 
     log("Sismo confirmado");
-
   }
 
   if (oldSismo && !sismo) {
 
     log("Evento sísmico finalizado");
-
   }
 
   if (flama && !oldFlama) {
 
     log("ALERTA: flama detectada");
+  }
 
+  if (!flama && oldFlama) {
+
+    log("Detección de flama finalizada");
   }
 
   if (gas && !oldGas) {
 
     log("Alarma de gas / humo activada");
-
   }
 
   if (!gas && oldGas) {
 
-    log("Alarma de gas / humo desactivada");
-
+    log(
+      "Alarma ambiental desactivada " +
+      "por recuperación"
+    );
   }
 }
 
@@ -1354,7 +1770,6 @@ function decode(value) {
   return new TextDecoder()
     .decode(value)
     .trim();
-
 }
 
 // =======================================
@@ -1375,20 +1790,23 @@ async function subscribe(
     "characteristicvaluechanged",
 
     event => handler(
+
       decode(event.target.value)
     )
-
   );
 
   await characteristic.startNotifications();
 
   handler(
-    decode(await characteristic.readValue())
+
+    decode(
+      await characteristic.readValue()
+    )
   );
 }
 
 // =======================================
-// DESCONEXION
+// EVENTO DE DESCONEXION
 // =======================================
 
 function handleDisconnected() {
@@ -1399,7 +1817,6 @@ function handleDisconnected() {
     "Conexión Bluetooth perdida.";
 
   log("Conexión Bluetooth perdida");
-
 }
 
 // =======================================
@@ -1427,25 +1844,29 @@ async function connect() {
     if (device) {
 
       device.removeEventListener(
+
         "gattserverdisconnected",
+
         handleDisconnected
       );
-
     }
 
     device =
       await navigator.bluetooth.requestDevice({
 
         filters: [
+
           { name: "VLA-Smart-Home" }
+
         ],
 
         optionalServices: [SERVICE]
-
       });
 
     device.addEventListener(
+
       "gattserverdisconnected",
+
       handleDisconnected
     );
 
@@ -1455,10 +1876,14 @@ async function connect() {
     server = await device.gatt.connect();
 
     const service =
-      await server.getPrimaryService(SERVICE);
+      await server.getPrimaryService(
+        SERVICE
+      );
 
     control =
-      await service.getCharacteristic(CONTROL);
+      await service.getCharacteristic(
+        CONTROL
+      );
 
     await subscribe(
       service,
@@ -1473,17 +1898,19 @@ async function connect() {
     );
 
     await subscribe(
+
       service,
+
       QUAKE,
+
       value => {
 
         $("peak").textContent =
           value + " G";
-
       }
     );
 
-    // NUEVA CARACTERISTICA MQ-2
+    // ESTADO AVANZADO MQ-2
 
     try {
 
@@ -1492,27 +1919,30 @@ async function connect() {
         MQ,
         mqStatus
       );
-
     }
 
     catch (error) {
 
       mqPhase = -1;
 
+      muteSupported = false;
+
       $("mqState").textContent =
         "Estado no disponible";
 
       $("mqDetail").textContent =
-        "Actualiza el programa del ESP32 " +
-        "para visualizar la calibración.";
+        "Actualiza el programa del ESP32.";
 
       log(
         "Estado avanzado MQ-2 no disponible"
       );
+    }
 
-      renderGas();
-      security();
+    if (!device.gatt.connected) {
 
+      throw Error(
+        "Bluetooth desconectado"
+      );
     }
 
     connected = true;
@@ -1527,13 +1957,20 @@ async function connect() {
 
     $("disconnect").disabled = false;
 
-    enableControls();
+    updateFreshness();
+
+    renderGas();
+
+    renderSirena();
+
+    security();
+
+    renderAlarmControl();
 
     $("message").textContent =
       "Conectado al ESP32-S3";
 
     log("Bluetooth conectado");
-
   }
 
   catch (error) {
@@ -1541,22 +1978,22 @@ async function connect() {
     if (device?.gatt?.connected) {
 
       device.gatt.disconnect();
-
     }
 
     disconnectUI();
 
     $("message").textContent =
       "Error: " + error.message;
-
   }
 }
 
 // =======================================
-// ENVIAR COMANDOS
+// ENVIAR COMANDOS BLE
 // =======================================
 
 function send(command) {
+
+  const targetControl = control;
 
   sendQueue = sendQueue
 
@@ -1564,35 +2001,34 @@ function send(command) {
 
     .then(async () => {
 
-      if (!connected || !control) {
+      if (
+        !connected ||
+        !control ||
+        control !== targetControl
+      ) {
 
         throw Error("Sin conexión Bluetooth");
-
       }
 
       await control.writeValueWithResponse(
 
         new TextEncoder().encode(command)
-
       );
 
       log("Comando enviado: " + command);
-
     })
 
     .catch(error => {
 
       $("message").textContent =
         "Comando fallido: " + error.message;
-
     });
 
   return sendQueue;
-
 }
 
 // =======================================
-// BOTONES DE CONEXION
+// BOTONES BLUETOOTH
 // =======================================
 
 $("connect").onclick = connect;
@@ -1602,12 +2038,13 @@ $("disconnect").onclick = () => {
   if (device?.gatt?.connected) {
 
     device.removeEventListener(
+
       "gattserverdisconnected",
+
       handleDisconnected
     );
 
     device.gatt.disconnect();
-
   }
 
   disconnectUI();
@@ -1616,7 +2053,42 @@ $("disconnect").onclick = () => {
     "Desconectado manualmente.";
 
   log("Bluetooth desconectado");
+};
 
+// =======================================
+// SILENCIAR ALARMA AMBIENTAL
+// =======================================
+
+$("muteGas").onclick = () => {
+
+  if (
+    connected &&
+    telemetryFresh &&
+    muteSupported &&
+    gas &&
+    mqPhase === 4 &&
+    !gasSilenciado
+  ) {
+
+    send("GAS=MUTE");
+  }
+};
+
+// =======================================
+// REACTIVAR ALARMA AMBIENTAL
+// =======================================
+
+$("unmuteGas").onclick = () => {
+
+  if (
+    connected &&
+    telemetryFresh &&
+    muteSupported &&
+    gasSilenciado
+  ) {
+
+    send("GAS=UNMUTE");
+  }
 };
 
 // =======================================
@@ -1632,12 +2104,12 @@ for (let i = 1; i <= 2; i++) {
     event.target.checked = !value;
 
     send(
+
       "L" + i + "=" +
+
       (value ? 1 : 0)
     );
-
   };
-
 }
 
 $("allOn").onclick =
@@ -1659,11 +2131,12 @@ $("water").onchange = event => {
   if (!blocked && !sismo) {
 
     send(
-      "WATER=" + (value ? 1 : 0)
+
+      "WATER=" +
+
+      (value ? 1 : 0)
     );
-
   }
-
 };
 
 $("stopWater").onclick =
@@ -1679,10 +2152,30 @@ $("resetWater").onclick = () => {
   ) {
 
     send("WATER=RESET");
+  }
+};
 
+// =======================================
+// SUPERVISION DE TELEMETRIA
+// =======================================
+
+setInterval(() => {
+
+  if (!connected) return;
+
+  updateFreshness();
+
+  security();
+
+  renderAlarmControl();
+
+  if (!telemetryFresh) {
+
+    $("updated").textContent =
+      "Sin telemetría reciente";
   }
 
-};
+}, 1000);
 
 // =======================================
 // ESTADO INICIAL
