@@ -1,12 +1,17 @@
-
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
+
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<meta name="viewport"
+      content="width=device-width, initial-scale=1">
+
 <title>VLA Smart Home</title>
 
 <style>
+
 :root {
   color-scheme: dark;
   --bg: #0a1120;
@@ -14,9 +19,14 @@
   --line: #293a54;
   --muted: #9aabc1;
   --blue: #5289f7;
+  --green: #86efac;
+  --yellow: #fcd34d;
+  --red: #fca5a5;
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
 
 body {
   margin: 0;
@@ -34,8 +44,15 @@ header {
   gap: 10px;
 }
 
-.logo { font-size: 22px; font-weight: 800; }
-.muted, small { color: var(--muted); font-size: 13px; }
+.logo {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.muted, small {
+  color: var(--muted);
+  font-size: 13px;
+}
 
 main {
   max-width: 1080px;
@@ -51,7 +68,14 @@ main {
   margin-bottom: 15px;
 }
 
-h2 { font-size: 18px; margin: 6px 0 16px; }
+h2 {
+  font-size: 18px;
+  margin: 6px 0 16px;
+}
+
+h3 {
+  font-size: 16px;
+}
 
 .grid {
   display: grid;
@@ -94,9 +118,18 @@ button {
   cursor: pointer;
 }
 
-button.secondary { background: #35445e; }
-button.danger { background: #a83e49; }
-button:disabled { opacity: .48; cursor: not-allowed; }
+button.secondary {
+  background: #35445e;
+}
+
+button.danger {
+  background: #a83e49;
+}
+
+button:disabled {
+  opacity: .48;
+  cursor: not-allowed;
+}
 
 .badge {
   background: #344255;
@@ -105,18 +138,29 @@ button:disabled { opacity: .48; cursor: not-allowed; }
   font-size: 12px;
 }
 
-.ok { color: #86efac; }
-.alert { color: #fca5a5; }
-.warn { color: #fcd34d; }
+.ok {
+  color: var(--green);
+}
+
+.alert {
+  color: var(--red);
+}
+
+.warn {
+  color: var(--yellow);
+}
 
 .switch {
   position: relative;
   width: 58px;
   height: 32px;
   display: inline-block;
+  flex-shrink: 0;
 }
 
-.switch input { opacity: 0; }
+.switch input {
+  opacity: 0;
+}
 
 .slider {
   position: absolute;
@@ -138,16 +182,76 @@ button:disabled { opacity: .48; cursor: not-allowed; }
   transition: .18s;
 }
 
-input:checked + .slider { background: #2563eb; }
-input:checked + .slider:before { transform: translateX(26px); }
-input:disabled + .slider { opacity: .5; cursor: not-allowed; }
+input:checked + .slider {
+  background: #2563eb;
+}
+
+input:checked + .slider:before {
+  transform: translateX(26px);
+}
+
+input:disabled + .slider {
+  opacity: .5;
+  cursor: not-allowed;
+}
 
 .hero {
-  background: linear-gradient(110deg, #163856, #172339);
+  background: linear-gradient(
+    110deg,
+    #163856,
+    #172339
+  );
+}
+
+/* ======================================
+   CALIBRACION MQ-2
+====================================== */
+
+.mq-state {
+  margin-top: 12px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.progress-container {
+  width: 100%;
+  height: 9px;
+  background: #344255;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-top: 10px;
+}
+
+.progress-bar {
+  height: 100%;
+  width: 0%;
+  background: var(--yellow);
+  transition: width .4s ease;
+  border-radius: 10px;
+}
+
+.mq-detail {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 8px;
+  line-height: 1.5;
+}
+
+.pulse {
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: .55;
+  }
 }
 
 #events {
-  max-height: 170px;
+  max-height: 220px;
   overflow: auto;
   font-size: 13px;
   color: #ced7e4;
@@ -161,457 +265,1433 @@ footer {
 }
 
 @media(max-width:760px) {
-  .grid { grid-template-columns: repeat(2, 1fr); }
-  .controls { grid-template-columns: 1fr; }
-  .big { font-size: 25px; }
-  .logo { font-size: 18px; }
+
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .controls {
+    grid-template-columns: 1fr;
+  }
+
+  .big {
+    font-size: 25px;
+  }
+
+  .logo {
+    font-size: 18px;
+  }
+
+  .card {
+    padding: 16px;
+  }
 }
+
 </style>
+
 </head>
 
 <body>
+
 <header>
+
   <div>
-    <div class="logo">⌂ VLA Smart Home</div>
-    <small>Monitoreo y control residencial · ESP32-S3</small>
+    <div class="logo">
+      ⌂ VLA Smart Home
+    </div>
+
+    <small>
+      Monitoreo y control residencial · ESP32-S3
+    </small>
   </div>
-  <span id="connection" class="badge">Desconectado</span>
+
+  <span id="connection" class="badge">
+    Desconectado
+  </span>
+
 </header>
 
 <main>
 
+<!-- =====================================
+     BLUETOOTH
+===================================== -->
+
 <section class="card">
+
   <div class="row">
+
     <div>
+
       <h2>Conexión directa Bluetooth</h2>
-      <small>Sin Firebase ni Wi-Fi. Conecta desde Chrome o Edge compatible.</small>
+
+      <small>
+        Sin Firebase ni Wi-Fi.
+        Conecta desde Chrome o Edge compatible.
+      </small>
+
     </div>
-    <div style="font-size:32px">📶</div>
+
+    <div style="font-size:32px">
+      📶
+    </div>
+
   </div>
 
   <div class="actions" style="margin-top:15px">
-    <button id="connect">Conectar ESP32-S3</button>
-    <button class="secondary" id="disconnect" disabled>Desconectar</button>
+
+    <button id="connect">
+      Conectar ESP32-S3
+    </button>
+
+    <button class="secondary"
+            id="disconnect"
+            disabled>
+
+      Desconectar
+
+    </button>
+
   </div>
 
-  <p id="message" class="muted">Esperando conexión.</p>
+  <p id="message" class="muted">
+    Esperando conexión.
+  </p>
+
 </section>
+
+<!-- =====================================
+     ESTADO GENERAL
+===================================== -->
 
 <section class="card hero">
+
   <div class="row">
+
     <div>
+
       <small>ESTADO GENERAL</small>
-      <h2 id="security" class="warn">Sin conexión</h2>
-      <small id="updated">Sin lecturas recientes</small>
+
+      <h2 id="security" class="warn">
+        Sin conexión
+      </h2>
+
+      <small id="updated">
+        Sin lecturas recientes
+      </small>
+
     </div>
-    <div id="shield" style="font-size:45px">🛡️</div>
+
+    <div id="shield" style="font-size:45px">
+      🛡️
+    </div>
+
   </div>
+
 </section>
+
+<!-- =====================================
+     MONITOREO AMBIENTAL
+===================================== -->
 
 <h2>Monitoreo ambiental</h2>
 
 <section class="grid">
+
   <div class="card">
+
     <small>🌡️ Temperatura</small>
-    <div class="big" id="temp">--</div>
+
+    <div class="big" id="temp">
+      --
+    </div>
+
     <small>Grados Celsius</small>
+
   </div>
 
   <div class="card">
+
     <small>💧 Humedad</small>
-    <div class="big" id="hum">--</div>
+
+    <div class="big" id="hum">
+      --
+    </div>
+
     <small>Porcentaje</small>
+
   </div>
 
   <div class="card">
+
     <small>🌫️ MQ-2</small>
-    <div class="big" id="mq2">--</div>
+
+    <div class="big" id="mq2">
+      --
+    </div>
+
     <small>Valor ADC</small>
+
+    <div id="mqState"
+         class="mq-state warn"
+         role="status">
+
+      Sin conexión
+
+    </div>
+
+    <div id="progressContainer"
+         class="progress-container"
+         hidden>
+
+      <div id="mqProgress"
+           class="progress-bar">
+      </div>
+
+    </div>
+
+    <div id="mqDetail"
+         class="mq-detail">
+
+      Esperando sensor.
+
+    </div>
+
   </div>
 
   <div class="card">
+
     <small>📈 Vibración</small>
-    <div class="big" id="peak">--</div>
+
+    <div class="big" id="peak">
+      --
+    </div>
+
     <small>Pico diferencial en G</small>
+
   </div>
+
 </section>
+
+<!-- =====================================
+     SEGURIDAD
+===================================== -->
 
 <h2>Seguridad</h2>
 
 <section class="grid">
+
   <div class="card">
+
     <h3>🔥 Flama</h3>
-    <strong id="flame">--</strong>
+
+    <strong id="flame">
+      --
+    </strong>
+
   </div>
 
   <div class="card">
+
     <h3>🌫️ Gas / humo</h3>
-    <strong id="gas">--</strong>
+
+    <strong id="gas">
+      --
+    </strong>
+
   </div>
 
   <div class="card">
+
     <h3>📳 Sismo</h3>
-    <strong id="quake">--</strong>
+
+    <strong id="quake">
+      --
+    </strong>
+
   </div>
 
   <div class="card">
+
     <h3>🚨 Sirena</h3>
-    <strong id="siren">--</strong>
+
+    <strong id="siren">
+      --
+    </strong>
+
   </div>
+
 </section>
+
+<!-- =====================================
+     CONTROL DE ILUMINACION
+===================================== -->
 
 <h2>Control de iluminación</h2>
 
 <section class="controls">
+
   <div class="card row">
+
     <div>
+
       <h3>💡 Primer piso</h3>
-      <small id="label1">Desconectado</small>
+
+      <small id="label1">
+        Desconectado
+      </small>
+
     </div>
+
     <label class="switch">
-      <input id="light1" type="checkbox" disabled>
+
+      <input id="light1"
+             type="checkbox"
+             disabled>
+
       <span class="slider"></span>
+
     </label>
+
   </div>
 
   <div class="card row">
+
     <div>
+
       <h3>💡 Segundo piso</h3>
-      <small id="label2">Desconectado</small>
+
+      <small id="label2">
+        Desconectado
+      </small>
+
     </div>
+
     <label class="switch">
-      <input id="light2" type="checkbox" disabled>
+
+      <input id="light2"
+             type="checkbox"
+             disabled>
+
       <span class="slider"></span>
+
     </label>
+
   </div>
+
 </section>
 
 <section class="card">
+
   <div class="actions">
-    <button id="allOn" disabled>Encender ambos pisos</button>
-    <button id="allOff" class="secondary" disabled>Apagar ambos pisos</button>
+
+    <button id="allOn" disabled>
+      Encender ambos pisos
+    </button>
+
+    <button id="allOff"
+            class="secondary"
+            disabled>
+
+      Apagar ambos pisos
+
+    </button>
+
   </div>
+
 </section>
+
+<!-- =====================================
+     BOMBA DE AGUA
+===================================== -->
 
 <h2>Suministro de agua</h2>
 
 <section class="card">
+
   <div class="row">
+
     <div>
-      <h3>💦 Bomba de agua · GPIO 12</h3>
-      <small id="waterLabel">Desconectado</small>
+
+      <h3>💦 Bomba de agua · GPIO 14</h3>
+
+      <small id="waterLabel">
+        Desconectado
+      </small>
+
     </div>
 
     <label class="switch">
-      <input id="water" type="checkbox" disabled>
+
+      <input id="water"
+             type="checkbox"
+             disabled>
+
       <span class="slider"></span>
+
     </label>
+
   </div>
 
   <p id="waterSafety" class="muted">
-    Durante un sismo confirmado, la bomba queda bloqueada hasta el rearme manual.
+
+    Durante un sismo confirmado,
+    la bomba queda bloqueada hasta
+    el rearme manual.
+
   </p>
 
   <div class="actions">
-    <button id="resetWater" class="secondary" disabled>
+
+    <button id="resetWater"
+            class="secondary"
+            disabled>
+
       Rearmar después del sismo
+
     </button>
 
-    <button id="stopWater" class="danger" disabled>
+    <button id="stopWater"
+            class="danger"
+            disabled>
+
       Apagar bomba
+
     </button>
+
   </div>
+
 </section>
 
+<!-- =====================================
+     REGISTRO DE EVENTOS
+===================================== -->
+
 <section class="card">
+
   <h2>Registro de eventos</h2>
-  <div id="events">Esperando conexión Bluetooth.</div>
+
+  <div id="events">
+    Esperando conexión Bluetooth.
+  </div>
+
 </section>
 
 </main>
 
 <footer>
-  VLA Smart Home · BLE / ESP-NOW · Proyecto experimental
+
+  VLA Smart Home · BLE / ESP-NOW
+  · Proyecto experimental
+
 </footer>
 
 <script>
-const SERVICE = "73a10000-90ab-4d37-bb9e-75b4a20f0001";
-const ENV = "73a10001-90ab-4d37-bb9e-75b4a20f0001";
-const STATUS = "73a10002-90ab-4d37-bb9e-75b4a20f0001";
-const QUAKE = "73a10003-90ab-4d37-bb9e-75b4a20f0001";
-const CONTROL = "73a10004-90ab-4d37-bb9e-75b4a20f0001";
+
+// =======================================
+// UUID BLUETOOTH
+// =======================================
+
+const SERVICE =
+  "73a10000-90ab-4d37-bb9e-75b4a20f0001";
+
+const ENV =
+  "73a10001-90ab-4d37-bb9e-75b4a20f0001";
+
+const STATUS =
+  "73a10002-90ab-4d37-bb9e-75b4a20f0001";
+
+const QUAKE =
+  "73a10003-90ab-4d37-bb9e-75b4a20f0001";
+
+const CONTROL =
+  "73a10004-90ab-4d37-bb9e-75b4a20f0001";
+
+const MQ =
+  "73a10005-90ab-4d37-bb9e-75b4a20f0001";
 
 const $ = id => document.getElementById(id);
+
+// =======================================
+// VARIABLES
+// =======================================
 
 let device = null;
 let server = null;
 let control = null;
+
 let connected = false;
 let blocked = false;
 let sismo = false;
 let flama = false;
 let gas = false;
 
+let statusReceived = false;
+
+let mqPhase = -1;
+let mqRejected = 0;
+
 let sendQueue = Promise.resolve();
 
+// =======================================
+// REGISTRO DE EVENTOS
+// =======================================
+
 function log(msg) {
+
   const e = document.createElement("div");
-  e.textContent = "[" + new Date().toLocaleTimeString() + "] " + msg;
+
+  e.textContent =
+    "[" +
+    new Date().toLocaleTimeString() +
+    "] " +
+    msg;
+
   $("events").prepend(e);
 
   while ($("events").children.length > 40) {
+
     $("events").lastChild.remove();
+
   }
 }
+
+// =======================================
+// HABILITAR CONTROLES
+// =======================================
 
 function enableControls() {
-  for (const id of ["light1", "light2", "allOn", "allOff", "stopWater"]) {
-    $(id).disabled = !connected;
+
+  const available =
+    connected && statusReceived;
+
+  for (const id of [
+    "light1",
+    "light2",
+    "allOn",
+    "allOff",
+    "stopWater"
+  ]) {
+
+    $(id).disabled = !available;
+
   }
 
-  $("water").disabled = !connected || blocked || sismo;
-  $("resetWater").disabled = !connected || !blocked || sismo;
+  $("water").disabled =
+    !available || blocked || sismo;
+
+  $("resetWater").disabled =
+    !available || !blocked || sismo;
 }
+
+// =======================================
+// MOSTRAR ESTADOS
+// =======================================
 
 function show(id, value) {
-  $(id).textContent = value ? "ALERTA" : "NORMAL";
-  $(id).className = value ? "alert" : "ok";
+
+  $(id).textContent =
+    value ? "ALERTA" : "NORMAL";
+
+  $(id).className =
+    value ? "alert" : "ok";
 }
+
+// =======================================
+// ESTADO GENERAL
+// =======================================
 
 function security() {
-  const alarm = flama || gas || sismo;
 
-  $("security").textContent = alarm
-    ? "¡ALERTA DETECTADA!"
-    : "Vivienda en estado normal";
+  const alarm =
+    flama || gas || sismo || mqPhase === 4;
 
-  $("security").className = alarm ? "alert" : "ok";
-  $("shield").textContent = alarm ? "⚠️" : "🛡️";
+  if (alarm) {
+
+    $("security").textContent =
+      "¡ALERTA DETECTADA!";
+
+    $("security").className = "alert";
+
+    $("shield").textContent = "⚠️";
+
+  }
+
+  else if (!statusReceived) {
+
+    $("security").textContent =
+      "Esperando estado del sistema";
+
+    $("security").className = "warn";
+
+    $("shield").textContent = "📡";
+
+  }
+
+  else if (mqPhase === 0) {
+
+    $("security").textContent =
+      "MQ-2 en calentamiento";
+
+    $("security").className = "warn";
+
+    $("shield").textContent = "⏳";
+
+  }
+
+  else if (mqPhase === 1) {
+
+    $("security").textContent =
+      "Calibrando sensor de gas / humo";
+
+    $("security").className = "warn";
+
+    $("shield").textContent = "⏳";
+
+  }
+
+  else if (mqPhase === 3) {
+
+    $("security").textContent =
+      "Advertencia ambiental";
+
+    $("security").className = "warn";
+
+    $("shield").textContent = "⚠️";
+
+  }
+
+  else if (mqPhase === 2) {
+
+    $("security").textContent =
+      "Sin alertas detectadas";
+
+    $("security").className = "ok";
+
+    $("shield").textContent = "🛡️";
+
+  }
+
+  else {
+
+    $("security").textContent =
+      "Monitoreo de gas no disponible";
+
+    $("security").className = "warn";
+
+    $("shield").textContent = "⏳";
+
+  }
 }
 
+// =======================================
+// ESTADO DE GAS
+// =======================================
+
+function renderGas() {
+
+  if (gas || mqPhase === 4) {
+
+    $("gas").textContent = "ALERTA";
+
+    $("gas").className = "alert";
+
+  }
+
+  else if (mqPhase === 0) {
+
+    $("gas").textContent = "CALENTANDO";
+
+    $("gas").className = "warn";
+
+  }
+
+  else if (mqPhase === 1) {
+
+    $("gas").textContent = "CALIBRANDO";
+
+    $("gas").className = "warn";
+
+  }
+
+  else if (mqPhase === 3) {
+
+    $("gas").textContent = "ADVERTENCIA";
+
+    $("gas").className = "warn";
+
+  }
+
+  else if (mqPhase === 2 && statusReceived) {
+
+    show("gas", false);
+
+  }
+
+  else {
+
+    $("gas").textContent = "NO DISPONIBLE";
+
+    $("gas").className = "warn";
+
+  }
+}
+
+// =======================================
+// INTERFAZ DESCONECTADA
+// =======================================
+
 function disconnectUI() {
+
   connected = false;
+  statusReceived = false;
+
   control = null;
   server = null;
+
   blocked = false;
   sismo = false;
+  flama = false;
+  gas = false;
 
-  $("connection").textContent = "Desconectado";
-  $("connection").style.background = "#344255";
+  mqPhase = -1;
+  mqRejected = 0;
+
+  $("connection").textContent =
+    "Desconectado";
+
+  $("connection").style.background =
+    "#344255";
+
   $("connect").disabled = false;
+
   $("disconnect").disabled = true;
 
   enableControls();
 
-  $("security").textContent = "Sin conexión";
+  $("security").textContent =
+    "Sin conexión";
+
   $("security").className = "warn";
-  $("updated").textContent = "Sin lecturas recientes";
+
+  $("updated").textContent =
+    "Sin lecturas recientes";
+
   $("shield").textContent = "📡";
 
   for (const id of [
-    "temp", "hum", "mq2", "peak",
-    "flame", "gas", "quake", "siren"
+    "temp",
+    "hum",
+    "mq2",
+    "peak",
+    "flame",
+    "gas",
+    "quake",
+    "siren"
   ]) {
+
     $(id).textContent = "--";
+
+    $(id).classList.remove(
+      "ok", "warn", "alert"
+    );
+
   }
 
-  $("label1").textContent = "Desconectado";
-  $("label2").textContent = "Desconectado";
-  $("waterLabel").textContent = "Desconectado";
-  $("waterSafety").textContent = "Sin estado confirmado del ESP32-S3";
+  $("mqState").textContent =
+    "Sin conexión";
+
+  $("mqState").className =
+    "mq-state warn";
+
+  $("mqDetail").textContent =
+    "Esperando sensor.";
+
+  $("progressContainer").hidden = true;
+
+  $("mqProgress").style.width = "0%";
+
+  $("label1").textContent =
+    "Desconectado";
+
+  $("label2").textContent =
+    "Desconectado";
+
+  $("waterLabel").textContent =
+    "Desconectado";
+
+  $("waterSafety").textContent =
+    "Sin estado confirmado del ESP32-S3";
 }
 
+// =======================================
+// DATOS AMBIENTALES
+// =======================================
+
 function environment(value) {
+
   const p = value.split(",");
+
   if (p.length < 3) return;
 
-  $("temp").textContent = p[0] === "nan" ? "--" : p[0] + " °C";
-  $("hum").textContent = p[1] === "nan" ? "--" : p[1] + " %";
+  $("temp").textContent =
+    p[0] === "nan"
+      ? "--"
+      : p[0] + " °C";
+
+  $("hum").textContent =
+    p[1] === "nan"
+      ? "--"
+      : p[1] + " %";
+
   $("mq2").textContent = p[2];
 
   $("updated").textContent =
-    "Lectura: " + new Date().toLocaleTimeString();
+    "Lectura: " +
+    new Date().toLocaleTimeString();
 }
 
-function status(value) {
+// =======================================
+// CALIBRACION MQ-2
+// =======================================
+
+function mqStatus(value) {
+
   const p = value.split(",");
+
+  if (p.length < 3) return;
+
+  const phase = Number(p[0]);
+
+  if (!Number.isInteger(phase) ||
+      phase < 0 || phase > 4) {
+
+    return;
+
+  }
+
+  const progress = Math.max(
+    0,
+    Math.min(100, Number(p[1]) || 0)
+  );
+
+  const rejected = Math.max(
+    0,
+    Number(p[2]) || 0
+  );
+
+  const oldPhase = mqPhase;
+
+  const oldRejected = mqRejected;
+
+  mqPhase = phase;
+  mqRejected = rejected;
+
+  const calibrating =
+    phase === 0 || phase === 1;
+
+  $("progressContainer").hidden =
+    !calibrating;
+
+  $("mqProgress").style.width =
+    progress + "%";
+
+  // CALENTAMIENTO
+
+  if (phase === 0) {
+
+    $("mqState").textContent =
+      "⏳ Calentando · " +
+      progress + "%";
+
+    $("mqState").className =
+      "mq-state warn pulse";
+
+    $("mqDetail").textContent =
+      "Estabilización inicial. " +
+      "Detección de gas no disponible.";
+
+  }
+
+  // CALIBRACION
+
+  else if (phase === 1) {
+
+    $("mqState").textContent =
+      "⏳ Calibrando · " +
+      progress + "%";
+
+    $("mqState").className =
+      "mq-state warn pulse";
+
+    $("mqDetail").textContent =
+      "Calculando media y desviación estándar. " +
+      "Ventanas rechazadas: " +
+      rejected +
+      ". El progreso puede reiniciarse.";
+
+  }
+
+  // MONITOREO NORMAL
+
+  else if (phase === 2) {
+
+    $("mqState").textContent =
+      "✓ Monitoreo activo";
+
+    $("mqState").className =
+      "mq-state ok";
+
+    $("mqDetail").textContent =
+      "Calibración completada. " +
+      "Detección adaptativa habilitada.";
+
+  }
+
+  // ADVERTENCIA
+
+  else if (phase === 3) {
+
+    $("mqState").textContent =
+      "⚠ Advertencia";
+
+    $("mqState").className =
+      "mq-state warn";
+
+    $("mqDetail").textContent =
+      "Incremento ambiental anormal. " +
+      "Adaptación estadística suspendida.";
+
+  }
+
+  // ALERTA
+
+  else if (phase === 4) {
+
+    $("mqState").textContent =
+      "🚨 Alerta de gas / humo";
+
+    $("mqState").className =
+      "mq-state alert pulse";
+
+    $("mqDetail").textContent =
+      "Anomalía detectada. " +
+      "Alarma activada.";
+
+  }
+
+  // REGISTRO DE CAMBIOS
+
+  if (oldPhase !== phase) {
+
+    const messages = [
+
+      "MQ-2: calentamiento iniciado",
+
+      "MQ-2: calibración estadística en curso",
+
+      "MQ-2: monitoreo activo, sin alerta",
+
+      "MQ-2: advertencia ambiental",
+
+      "MQ-2: ALERTA DE GAS / HUMO"
+
+    ];
+
+    log(messages[phase]);
+
+    if (phase === 2 &&
+        (oldPhase === 0 || oldPhase === 1)) {
+
+      log("MQ-2: calibración completada");
+
+    }
+  }
+
+  if (rejected > oldRejected) {
+
+    log(
+      "MQ-2: ventana rechazada. " +
+      "Esperando estabilidad. Total: " +
+      rejected
+    );
+
+  }
+
+  renderGas();
+  security();
+}
+
+// =======================================
+// ESTADOS GENERALES
+// =======================================
+
+function status(value) {
+
+  const p = value.split(",");
+
   if (p.length < 8) return;
+
+  if (!p.slice(0, 8).every(
+    v => v === "0" || v === "1"
+  )) return;
+
+  statusReceived = true;
 
   const oldBlock = blocked;
   const oldSismo = sismo;
+  const oldFlama = flama;
+  const oldGas = gas;
 
   flama = p[0] === "1";
   gas = p[1] === "1";
   sismo = p[2] === "1";
+
   blocked = p[7] === "1";
 
   const pump = p[6] === "1";
 
-  $("light1").checked = p[4] === "1";
-  $("light2").checked = p[5] === "1";
+  $("light1").checked =
+    p[4] === "1";
+
+  $("light2").checked =
+    p[5] === "1";
 
   $("label1").textContent =
-    $("light1").checked ? "Encendido" : "Apagado";
+    $("light1").checked
+      ? "Encendido"
+      : "Apagado";
 
   $("label2").textContent =
-    $("light2").checked ? "Encendido" : "Apagado";
+    $("light2").checked
+      ? "Encendido"
+      : "Apagado";
 
   $("water").checked = pump;
 
-  $("waterLabel").textContent = blocked
-    ? "BLOQUEADA POR SISMO"
-    : pump ? "Bomba encendida" : "Bomba apagada";
+  $("waterLabel").textContent =
+    blocked
+      ? "BLOQUEADA POR SISMO"
+      : pump
+        ? "Bomba encendida"
+        : "Bomba apagada";
 
-  $("waterSafety").textContent = blocked
-    ? "Corte activado: rearma manualmente después de verificar condiciones seguras."
-    : sismo
-      ? "Sismo en curso: bomba forzada a OFF."
-      : "Control manual disponible (prototipo).";
+  $("waterSafety").textContent =
+    blocked
+
+      ? "Corte activado: rearma manualmente " +
+        "después de verificar condiciones seguras."
+
+      : sismo
+
+        ? "Sismo en curso: bomba forzada a OFF."
+
+        : "Control manual disponible (prototipo).";
 
   show("flame", flama);
-  show("gas", gas);
+
+  renderGas();
+
   show("quake", sismo);
 
-  $("siren").textContent = p[3] === "1" ? "ACTIVA" : "APAGADA";
-  $("siren").className = p[3] === "1" ? "alert" : "ok";
+  $("siren").textContent =
+    p[3] === "1"
+      ? "ACTIVA"
+      : "APAGADA";
+
+  $("siren").className =
+    p[3] === "1"
+      ? "alert"
+      : "ok";
 
   security();
+
   enableControls();
 
   if (blocked && !oldBlock) {
-    log("CORTE DE AGUA por sismo: bomba bloqueada");
+
+    log("CORTE DE AGUA: bomba bloqueada");
+
   }
 
   if (sismo && !oldSismo) {
+
     log("Sismo confirmado");
+
+  }
+
+  if (oldSismo && !sismo) {
+
+    log("Evento sísmico finalizado");
+
+  }
+
+  if (flama && !oldFlama) {
+
+    log("ALERTA: flama detectada");
+
+  }
+
+  if (gas && !oldGas) {
+
+    log("Alarma de gas / humo activada");
+
+  }
+
+  if (!gas && oldGas) {
+
+    log("Alarma de gas / humo desactivada");
+
   }
 }
 
+// =======================================
+// DECODIFICAR DATOS BLE
+// =======================================
+
 function decode(value) {
-  return new TextDecoder().decode(value).trim();
+
+  return new TextDecoder()
+    .decode(value)
+    .trim();
+
 }
 
-async function subscribe(service, uuid, handler) {
-  const characteristic = await service.getCharacteristic(uuid);
+// =======================================
+// SUSCRIPCION BLUETOOTH
+// =======================================
 
-  handler(decode(await characteristic.readValue()));
+async function subscribe(
+  service,
+  uuid,
+  handler
+) {
+
+  const characteristic =
+    await service.getCharacteristic(uuid);
+
+  characteristic.addEventListener(
+
+    "characteristicvaluechanged",
+
+    event => handler(
+      decode(event.target.value)
+    )
+
+  );
 
   await characteristic.startNotifications();
 
-  characteristic.addEventListener(
-    "characteristicvaluechanged",
-    event => handler(decode(event.target.value))
+  handler(
+    decode(await characteristic.readValue())
   );
 }
 
+// =======================================
+// DESCONEXION
+// =======================================
+
+function handleDisconnected() {
+
+  disconnectUI();
+
+  $("message").textContent =
+    "Conexión Bluetooth perdida.";
+
+  log("Conexión Bluetooth perdida");
+
+}
+
+// =======================================
+// CONECTAR BLUETOOTH
+// =======================================
+
 async function connect() {
+
   if (!navigator.bluetooth) {
+
     $("message").textContent =
-      "Web Bluetooth no disponible. Utiliza Chrome o Edge compatible.";
+      "Web Bluetooth no disponible. " +
+      "Utiliza Chrome o Edge compatible.";
+
     return;
   }
 
+  $("connect").disabled = true;
+
   try {
-    $("message").textContent = "Buscando ESP32-S3...";
 
-    device = await navigator.bluetooth.requestDevice({
-      filters: [{ name: "VLA-Smart-Home" }],
-      optionalServices: [SERVICE]
-    });
+    $("message").textContent =
+      "Buscando ESP32-S3...";
 
-    device.addEventListener("gattserverdisconnected", () => {
-      disconnectUI();
-      log("Conexión Bluetooth perdida");
-    });
+    if (device) {
+
+      device.removeEventListener(
+        "gattserverdisconnected",
+        handleDisconnected
+      );
+
+    }
+
+    device =
+      await navigator.bluetooth.requestDevice({
+
+        filters: [
+          { name: "VLA-Smart-Home" }
+        ],
+
+        optionalServices: [SERVICE]
+
+      });
+
+    device.addEventListener(
+      "gattserverdisconnected",
+      handleDisconnected
+    );
+
+    $("message").textContent =
+      "Estableciendo conexión Bluetooth...";
 
     server = await device.gatt.connect();
 
-    const service = await server.getPrimaryService(SERVICE);
-    control = await service.getCharacteristic(CONTROL);
+    const service =
+      await server.getPrimaryService(SERVICE);
 
-    await subscribe(service, ENV, environment);
-    await subscribe(service, STATUS, status);
+    control =
+      await service.getCharacteristic(CONTROL);
 
-    await subscribe(service, QUAKE, value => {
-      $("peak").textContent = value + " G";
-    });
+    await subscribe(
+      service,
+      ENV,
+      environment
+    );
+
+    await subscribe(
+      service,
+      STATUS,
+      status
+    );
+
+    await subscribe(
+      service,
+      QUAKE,
+      value => {
+
+        $("peak").textContent =
+          value + " G";
+
+      }
+    );
+
+    // NUEVA CARACTERISTICA MQ-2
+
+    try {
+
+      await subscribe(
+        service,
+        MQ,
+        mqStatus
+      );
+
+    }
+
+    catch (error) {
+
+      mqPhase = -1;
+
+      $("mqState").textContent =
+        "Estado no disponible";
+
+      $("mqDetail").textContent =
+        "Actualiza el programa del ESP32 " +
+        "para visualizar la calibración.";
+
+      log(
+        "Estado avanzado MQ-2 no disponible"
+      );
+
+      renderGas();
+      security();
+
+    }
 
     connected = true;
 
-    $("connection").textContent = "● BLE conectado";
-    $("connection").style.background = "#14532d";
+    $("connection").textContent =
+      "● BLE conectado";
+
+    $("connection").style.background =
+      "#14532d";
+
     $("connect").disabled = true;
+
     $("disconnect").disabled = false;
 
     enableControls();
 
-    $("message").textContent = "Conectado al ESP32-S3";
+    $("message").textContent =
+      "Conectado al ESP32-S3";
+
     log("Bluetooth conectado");
 
-  } catch (error) {
+  }
+
+  catch (error) {
+
+    if (device?.gatt?.connected) {
+
+      device.gatt.disconnect();
+
+    }
+
     disconnectUI();
-    $("message").textContent = "Error: " + error.message;
+
+    $("message").textContent =
+      "Error: " + error.message;
+
   }
 }
 
+// =======================================
+// ENVIAR COMANDOS
+// =======================================
+
 function send(command) {
-  sendQueue = sendQueue.catch(() => {}).then(async () => {
-    if (!connected || !control) {
-      throw Error("Sin conexión Bluetooth");
-    }
 
-    await control.writeValueWithResponse(
-      new TextEncoder().encode(command)
-    );
+  sendQueue = sendQueue
 
-    log("Comando enviado: " + command);
+    .catch(() => {})
 
-  }).catch(error => {
-    $("message").textContent = "Comando fallido: " + error.message;
-  });
+    .then(async () => {
+
+      if (!connected || !control) {
+
+        throw Error("Sin conexión Bluetooth");
+
+      }
+
+      await control.writeValueWithResponse(
+
+        new TextEncoder().encode(command)
+
+      );
+
+      log("Comando enviado: " + command);
+
+    })
+
+    .catch(error => {
+
+      $("message").textContent =
+        "Comando fallido: " + error.message;
+
+    });
 
   return sendQueue;
+
 }
+
+// =======================================
+// BOTONES DE CONEXION
+// =======================================
 
 $("connect").onclick = connect;
 
 $("disconnect").onclick = () => {
+
   if (device?.gatt?.connected) {
+
+    device.removeEventListener(
+      "gattserverdisconnected",
+      handleDisconnected
+    );
+
     device.gatt.disconnect();
+
   }
+
   disconnectUI();
+
+  $("message").textContent =
+    "Desconectado manualmente.";
+
+  log("Bluetooth desconectado");
+
 };
 
+// =======================================
+// CONTROL DE LUCES
+// =======================================
+
 for (let i = 1; i <= 2; i++) {
+
   $("light" + i).onchange = event => {
+
     const value = event.target.checked;
+
     event.target.checked = !value;
 
-    send("L" + i + "=" + (value ? 1 : 0));
+    send(
+      "L" + i + "=" +
+      (value ? 1 : 0)
+    );
+
   };
+
 }
 
+$("allOn").onclick =
+  () => send("ALL=1");
+
+$("allOff").onclick =
+  () => send("ALL=0");
+
+// =======================================
+// CONTROL DE BOMBA
+// =======================================
+
 $("water").onchange = event => {
+
   const value = event.target.checked;
+
   event.target.checked = !value;
 
   if (!blocked && !sismo) {
-    send("WATER=" + (value ? 1 : 0));
+
+    send(
+      "WATER=" + (value ? 1 : 0)
+    );
+
   }
+
 };
 
-$("allOn").onclick = () => send("ALL=1");
-$("allOff").onclick = () => send("ALL=0");
-
-$("stopWater").onclick = () => send("WATER=0");
+$("stopWater").onclick =
+  () => send("WATER=0");
 
 $("resetWater").onclick = () => {
-  if (confirm("¿Verificaste que no hay vibraciones ni daños y quieres habilitar la bomba?")) {
+
+  if (
+    confirm(
+      "¿Verificaste que no hay vibraciones " +
+      "ni daños y quieres habilitar la bomba?"
+    )
+  ) {
+
     send("WATER=RESET");
+
   }
+
 };
 
+// =======================================
+// ESTADO INICIAL
+// =======================================
+
 disconnectUI();
+
 </script>
+
 </body>
+
 </html>
